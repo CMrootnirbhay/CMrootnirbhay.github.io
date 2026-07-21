@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>nirbhayxd — Bug Hunter</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💀</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --fg: #e0e0e0;
+  --green: #00ff41;
+  --dim-green: #00cc33;
+  --red: #ff3355;
+  --yellow: #ffcc00;
+  --blue: #3399ff;
+  --purple: #9966ff;
+  --cyan: #00e5ff;
+  --border: #1a1a2e;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Scanline overlay */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,255,65,0.015) 2px,
+    rgba(0,255,65,0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 100;
+  background: rgba(10,10,15,0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+nav .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--green);
+  text-decoration: none;
+}
+
+.logo span {
+  color: var(--fg);
+}
+
+.nav-links {
+  display: flex;
+  gap: 28px;
+  list-style: none;
+}
+
+.nav-links a {
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 0.2s;
+  position: relative;
+}
+
+.nav-links a:hover {
+  color: var(--green);
+}
+
+.nav-links a::before {
+  content: '// ';
+  color: var(--dim-green);
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-top: 80px;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(0,255,65,0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+
+.hero-left .tag {
+  font-size: 12px;
+  color: var(--dim-green);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-bottom: 20px;
+}
+
+.hero-left .tag::before {
+  content: '> ';
+  color: var(--green);
+}
+
+.hero-left h1 {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+
+.hero-left h1 .highlight {
+  color: var(--green);
+  text-shadow: 0 0 20px rgba(0,255,65,0.3);
+}
+
+.hero-left .subtitle {
+  font-size: 16px;
+  color: var(--cyan);
+  margin-bottom: 24px;
+  font-weight: 300;
+}
+
+.hero-left .subtitle::before {
+  content: '// ';
+  color: var(--dim-green);
+  opacity: 0.6;
+}
+
+.hero-left p {
+  font-size: 14px;
+  color: #888;
+  max-width: 400px;
+  line-height: 1.8;
+  margin-bottom: 32px;
+}
+
+/* Terminal prompt */
+.terminal-prompt {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  font-size: 13px;
+  position: relative;
+  overflow: hidden;
+}
+
+.terminal-prompt::before {
+  content: '┌──(nirbhayxd㉿hunter)-[~]\n└─$ ';
+  color: var(--green);
+}
+
+.terminal-prompt .cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--green);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 4px;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* Hero right - matrix/info panel */
+.hero-right {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 28px;
+  font-size: 13px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #666;
+}
+
+.info-label::before {
+  content: '> ';
+  color: var(--dim-green);
+  font-size: 11px;
+}
+
+.info-value {
+  color: var(--green);
+  font-weight: 500;
+}
+
+.info-value.red { color: var(--red); }
+.info-value.yellow { color: var(--yellow); }
+.info-value.cyan { color: var(--cyan); }
+.info-value.purple { color: var(--purple); }
+
+.marquee-tag {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: #444;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-tag span {
+  display: inline-block;
+  animation: scroll 20s linear infinite;
+}
+
+@keyframes scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Section headers */
+.section {
+  padding: 100px 0;
+  position: relative;
+}
+
+.section-header {
+  margin-bottom: 60px;
+}
+
+.section-number {
+  font-size: 12px;
+  color: var(--dim-green);
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.section-number::before {
+  content: '// ';
+  color: var(--dim-green);
+}
+
+.section-title {
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.section-title .highlight {
+  color: var(--green);
+}
+
+/* ── TOOLS / ARSENAL ── */
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.tool-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 28px;
+  transition: border-color 0.3s, transform 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.tool-card:hover {
+  border-color: var(--green);
+  transform: translateY(-2px);
+}
+
+.tool-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--green);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tool-card:hover::before {
+  opacity: 1;
+}
+
+.tool-icon {
+  font-size: 28px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.tool-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--fg);
+}
+
+.tool-card p {
+  font-size: 13px;
+  color: #777;
+  line-height: 1.7;
+}
+
+.tool-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.tool-tag {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(0,255,65,0.08);
+  color: var(--green);
+  border: 1px solid rgba(0,255,65,0.15);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── CAPABILITIES ── */
+.cap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.cap-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 32px;
+}
+
+.cap-number {
+  font-size: 12px;
+  color: var(--dim-green);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.cap-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--cyan);
+}
+
+.cap-card ul {
+  list-style: none;
+}
+
+.cap-card ul li {
+  font-size: 13px;
+  color: #888;
+  padding: 6px 0;
+  padding-left: 16px;
+  position: relative;
+}
+
+.cap-card ul li::before {
+  content: '>';
+  position: absolute;
+  left: 0;
+  color: var(--dim-green);
+  font-size: 12px;
+}
+
+/* ── PLATFORMS ── */
+.platforms {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+}
+
+.platforms h3 {
+  font-size: 18px;
+  margin-bottom: 24px;
+  color: var(--fg);
+}
+
+.platform-list {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.platform-badge {
+  padding: 8px 20px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s;
+}
+
+.platform-badge:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 0;
+  text-align: center;
+}
+
+footer .footer-name {
+  font-size: 16px;
+  color: var(--green);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+footer p {
+  font-size: 12px;
+  color: #555;
+}
+
+/* ── SCROLL INDICATOR ── */
+.scroll-indicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #444;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.scroll-line {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--green), transparent);
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+
+@keyframes scrollPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .hero-left h1 {
+    font-size: 32px;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .section-title {
+    font-size: 26px;
+  }
+
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cap-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <a href="#" class="logo">nirbhayxd<span>.dev</span></a>
+    <ul class="nav-links">
+      <li><a href="#arsenal">Arsenal</a></li>
+      <li><a href="#capabilities">Capabilities</a></li>
+      <li><a href="#platforms">Platforms</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div class="hero-left">
+        <div class="tag">Bug Bounty Hunter</div>
+        <h1>EVERY<br><span class="highlight">SYSTEM</span><br>BLEEDS.</h1>
+        <div class="subtitle">No system is clean. I find what's broken.</div>
+        <p>Hunting vulnerabilities across web applications, APIs, and network infrastructure. Automated scanners find the surface — I find what's underneath.</p>
+        <div class="terminal-prompt">
+          <span class="cursor"></span>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="info-row">
+          <span class="info-label">SUBJECT</span>
+          <span class="info-value">nirbhayxd</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">STATUS</span>
+          <span class="info-value green">HUNTING</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">THREAT_LVL</span>
+          <span class="info-value red">CRITICAL</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">SIG</span>
+          <span class="info-value cyan">7A:4F:C2:D3:B7:E9</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">NET_STATUS</span>
+          <span class="info-value green">ACTIVE</span>
+        </div>
+        <div class="marquee-tag">
+          <span>HACKERONE · BUG CROWD · INTIGRITI · YESWEHACK · OWLSEC · HACKERONE · BUG CROWD · INTIGRITI · YESWEHACK · OWLSEC · HACKERONE · BUG CROWD · INTIGRITI · YESWEHACK · OWLSEC · </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-indicator">
+    SCROLL
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- ARSENAL -->
+<section class="section" id="arsenal">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-number">01 / 03</div>
+      <h2 class="section-title">THE <span class="highlight">ARSENAL</span></h2>
+    </div>
+    <div class="tools-grid">
+      <div class="tool-card">
+        <span class="tool-icon">🌐</span>
+        <h3>Nmap</h3>
+        <p>Network discovery and security auditing. Port scanning, service enumeration, OS fingerprinting, and NSE scripting for deep reconnaissance.</p>
+        <div class="tool-tags">
+          <span class="tool-tag">Network</span>
+          <span class="tool-tag">Recon</span>
+          <span class="tool-tag">Enumeration</span>
+        </div>
+      </div>
+      <div class="tool-card">
+        <span class="tool-icon">🕷️</span>
+        <h3>Burp Suite</h3>
+        <p>Full-scope web application intercepting proxy. Intruder, Repeater, Scanner, and extensions for advanced API and session manipulation.</p>
+        <div class="tool-tags">
+          <span class="tool-tag">Web</span>
+          <span class="tool-tag">Proxy</span>
+          <span class="tool-tag">Fuzzing</span>
+        </div>
+      </div>
+      <div class="tool-card">
+        <span class="tool-icon">🔬</span>
+        <h3>Ghidra</h3>
+        <p>Software reverse engineering framework. Binary decompilation, vulnerability research, and exploit development across architectures.</p>
+        <div class="tool-tags">
+          <span class="tool-tag">Reverse</span>
+          <span class="tool-tag">Exploit</span>
+          <span class="tool-tag">Analysis</span>
+        </div>
+      </div>
+      <div class="tool-card">
+        <span class="tool-icon">📂</span>
+        <h3>Dirbuster</h3>
+        <p>Directory and file brute-forcing for web content discovery. Uncovers hidden endpoints, backup files, and admin panels.</p>
+        <div class="tool-tags">
+          <span class="tool-tag">Web</span>
+          <span class="tool-tag">Content</span>
+          <span class="tool-tag">Discovery</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section class="section" id="capabilities">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-number">02 / 03</div>
+      <h2 class="section-title">CORE <span class="highlight">CAPABILITIES</span></h2>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-card">
+        <div class="cap-number">// 01</div>
+        <h3>Web Application Pentesting</h3>
+        <ul>
+          <li>IDOR / BOLA exploitation</li>
+          <li>Business logic bypass</li>
+          <li>SSRF & blind SSRF</li>
+          <li>Stored, Reflected & DOM XSS</li>
+          <li>SQL injection & NoSQLi</li>
+          <li>JWT algorithm confusion</li>
+          <li>File upload bypass</li>
+          <li>Race condition attacks</li>
+        </ul>
+      </div>
+      <div class="cap-card">
+        <div class="cap-number">// 02</div>
+        <h3>API & Cloud Security</h3>
+        <ul>
+          <li>REST & GraphQL API testing</li>
+          <li>JWT & OAuth manipulation</li>
+          <li>AWS IAM privilege escalation</li>
+          <li>Cloud metadata exploitation</li>
+          <li>Kubernetes RBAC abuse</li>
+          <li>S3 bucket enumeration</li>
+          <li>Serverless function review</li>
+        </ul>
+      </div>
+      <div class="cap-card">
+        <div class="cap-number">// 03</div>
+        <h3>Network & Infrastructure</h3>
+        <ul>
+          <li>Network mapping & fingerprinting</li>
+          <li>Service enumeration</li>
+          <li>Protocol-specific attacks</li>
+          <li>Container escape techniques</li>
+          <li>Active Directory exploitation</li>
+          <li>Wireless penetration testing</li>
+          <li>Reverse engineering</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORMS -->
+<section class="section" id="platforms">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-number">03 / 03</div>
+      <h2 class="section-title">ACTIVE <span class="highlight">PLATFORMS</span></h2>
+    </div>
+    <div class="platforms">
+      <div class="platform-list">
+        <span class="platform-badge">HackerOne</span>
+        <span class="platform-badge">Bugcrowd</span>
+        <span class="platform-badge">Intigriti</span>
+        <span class="platform-badge">YesWeHack</span>
+        <span class="platform-badge">OWLsec</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-name">nirbhayxd // HUNTER</div>
+    <p>OPERATIONAL // © 2026 // ALL RIGHTS RESERVED</p>
+  </div>
+</footer>
+
+</body>
+</html>
