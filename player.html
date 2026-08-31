@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playing</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #player {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+
+    #centerIcon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      width: 100px;
+      height: 100px;
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    #centerIcon.show { animation: popFade 0.8s ease-out forwards; }
+
+    @keyframes popFade {
+      0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+      50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      padding: 40px 24px 20px;
+      opacity: 1;
+      transition: opacity 0.4s;
+    }
+
+    #controls.hidden { opacity: 0; pointer-events: none; }
+
+    #progressWrap {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 3px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    #progressWrap:hover { height: 10px; }
+
+    #progress {
+      height: 100%;
+      background: #4a9eff;
+      border-radius: 3px;
+      width: 0%;
+      position: relative;
+    }
+
+    #progress::after {
+      content: '';
+      position: absolute;
+      right: -7px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #progressWrap:hover #progress::after { opacity: 1; }
+
+    #bufferBar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .controls-row { display: flex; align-items: center; gap: 16px; }
+
+    .ctrl-btn {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 8px;
+      transition: background 0.2s;
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
+
+    #timeDisplay {
+      font-size: 1rem;
+      color: #aaa;
+      font-variant-numeric: tabular-nums;
+      min-width: 120px;
+    }
+
+    #videoTitle {
+      flex: 1;
+      font-size: 1rem;
+      color: #ccc;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .volume-group { display: flex; align-items: center; gap: 8px; }
+
+    #volumeSlider { width: 80px; accent-color: #4a9eff; cursor: pointer; }
+
+    #speedBtn {
+      font-size: 0.9rem;
+      padding: 4px 12px;
+      min-width: auto;
+      min-height: auto;
+      border: 1px solid #555;
+      border-radius: 6px;
+    }
+
+    #topBar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding: 16px 24px;
+      background: linear-gradient(rgba(0,0,0,0.85), transparent);
+      display: flex;
+      justify-content: space-between;
+      opacity: 1;
+      transition: opacity 0.4s;
+    }
+
+    #topBar.hidden { opacity: 0; pointer-events: none; }
+
+    #backBtn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+
+    #backBtn:hover { background: rgba(255,255,255,0.2); }
+
+    #spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+    #spinner.active { display: block; }
+
+    .spinner-ring {
+      width: 60px; height: 60px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #4a9eff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #error {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      display: none;
+      color: #ff4a4a;
+    }
+
+    #error.active { display: block; }
+    #error .icon { font-size: 3rem; margin-bottom: 12px; }
+    #error .msg { color: #aaa; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div id="player">
+    <video id="video" preload="metadata"></video>
+
+    <div id="centerIcon">▶</div>
+    <div id="spinner"><div class="spinner-ring"></div></div>
+
+    <div id="error">
+      <div class="icon">⚠</div>
+      <div>Failed to play video</div>
+      <div class="msg" id="errorMsg"></div>
+    </div>
+
+    <div id="topBar"><button id="backBtn">← Back</button></div>
+
+    <div id="controls">
+      <div id="progressWrap">
+        <div id="bufferBar"></div>
+        <div id="progress"></div>
+      </div>
+      <div class="controls-row">
+        <button class="ctrl-btn" id="playPauseBtn">▶</button>
+        <button class="ctrl-btn" id="rewBtn">⏪</button>
+        <button class="ctrl-btn" id="fwdBtn">⏩</button>
+        <div class="volume-group">
+          <button class="ctrl-btn" id="muteBtn">🔊</button>
+          <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+        </div>
+        <span id="timeDisplay">0:00 / 0:00</span>
+        <span id="videoTitle"></span>
+        <button class="ctrl-btn" id="speedBtn">1x</button>
+        <button class="ctrl-btn" id="fullscreenBtn">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    const $ = (sel) => document.querySelector(sel);
+
+    const video = $('#video');
+    const params = new URLSearchParams(window.location.search);
+    const src = params.get('src');
+    const title = params.get('title') || 'Video';
+
+    const controls = $('#controls');
+    const topBar = $('#topBar');
+    const playPauseBtn = $('#playPauseBtn');
+    const rewBtn = $('#rewBtn');
+    const fwdBtn = $('#fwdBtn');
+    const muteBtn = $('#muteBtn');
+    const volumeSlider = $('#volumeSlider');
+    const timeDisplay = $('#timeDisplay');
+    const videoTitle = $('#videoTitle');
+    const speedBtn = $('#speedBtn');
+    const fullscreenBtn = $('#fullscreenBtn');
+    const progressWrap = $('#progressWrap');
+    const progress = $('#progress');
+    const bufferBar = $('#bufferBar');
+    const centerIcon = $('#centerIcon');
+    const spinner = $('#spinner');
+    const errorEl = $('#error');
+    const errorMsg = $('#errorMsg');
+
+    const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+    let speedIdx = 2;
+    let hideTimer = null;
+
+    videoTitle.textContent = title;
+    document.title = title;
+
+    function fmt(s) {
+      if (!isFinite(s)) return '0:00';
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = Math.floor(s % 60);
+      return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+                   : `${m}:${String(sec).padStart(2,'0')}`;
+    }
+
+    function showControls() {
+      controls.classList.remove('hidden');
+      topBar.classList.remove('hidden');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideControls, 4000);
+    }
+
+    function hideControls() {
+      if (video.paused) return;
+      controls.classList.add('hidden');
+      topBar.classList.add('hidden');
+    }
+
+    function flashIcon(text) {
+      centerIcon.textContent = text;
+      centerIcon.classList.remove('show');
+      void centerIcon.offsetWidth;
+      centerIcon.classList.add('show');
+    }
+
+    function togglePlay() {
+      if (video.paused) video.play(); else video.pause();
+    }
+
+    video.addEventListener('play', () => {
+      playPauseBtn.textContent = '⏸';
+      flashIcon('▶');
+      hideTimer = setTimeout(hideControls, 4000);
+    });
+    video.addEventListener('pause', () => {
+      playPauseBtn.textContent = '▶';
+      flashIcon('⏸');
+      showControls();
+    });
+    video.addEventListener('timeupdate', () => {
+      if (!video.duration) return;
+      progress.style.width = (video.currentTime / video.duration * 100) + '%';
+      timeDisplay.textContent = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+    });
+    video.addEventListener('progress', () => {
+      if (video.buffered.length > 0 && video.duration) {
+        bufferBar.style.width = (video.buffered.end(video.buffered.length - 1) / video.duration * 100) + '%';
+      }
+    });
+    video.addEventListener('loadeddata', () => spinner.classList.remove('active'));
+    video.addEventListener('canplay', () => spinner.classList.remove('active'));
+    video.addEventListener('waiting', () => spinner.classList.add('active'));
+    video.addEventListener('playing', () => spinner.classList.remove('active'));
+
+    playPauseBtn.addEventListener('click', togglePlay);
+    rewBtn.addEventListener('click', () => { video.currentTime -= 10; flashIcon('⏪'); showControls(); });
+    fwdBtn.addEventListener('click', () => { video.currentTime += 10; flashIcon('⏩'); showControls(); });
+
+    volumeSlider.addEventListener('input', () => { video.volume = +volumeSlider.value; video.muted = false; updateMuteIcon(); });
+    muteBtn.addEventListener('click', () => { video.muted = !video.muted; updateMuteIcon(); });
+    function updateMuteIcon() {
+      if (video.muted || video.volume === 0) muteBtn.textContent = '🔇';
+      else if (video.volume < 0.5) muteBtn.textContent = '🔉';
+      else muteBtn.textContent = '🔊';
+    }
+
+    speedBtn.addEventListener('click', () => {
+      speedIdx = (speedIdx + 1) % speeds.length;
+      video.playbackRate = speeds[speedIdx];
+      speedBtn.textContent = speeds[speedIdx] + 'x';
+    });
+
+    progressWrap.addEventListener('click', (e) => {
+      const r = progressWrap.getBoundingClientRect();
+      video.currentTime = ((e.clientX - r.left) / r.width) * video.duration;
+      showControls();
+    });
+
+    fullscreenBtn.addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    });
+
+    backBtn.addEventListener('click', () => window.location.href = './gallery.html');
+
+    document.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case ' ': case 'Enter': e.preventDefault(); togglePlay(); showControls(); break;
+        case 'ArrowLeft': e.preventDefault(); video.currentTime -= 10; flashIcon('⏪'); showControls(); break;
+        case 'ArrowRight': e.preventDefault(); video.currentTime += 10; flashIcon('⏩'); showControls(); break;
+        case 'ArrowUp': e.preventDefault(); video.volume = Math.min(1, video.volume + 0.1); volumeSlider.value = video.volume; updateMuteIcon(); showControls(); break;
+        case 'ArrowDown': e.preventDefault(); video.volume = Math.max(0, video.volume - 0.1); volumeSlider.value = video.volume; updateMuteIcon(); showControls(); break;
+        case 'f': case 'F':
+          if (document.fullscreenElement) document.exitFullscreen();
+          else document.documentElement.requestFullscreen();
+          break;
+        case 'm': case 'M': video.muted = !video.muted; updateMuteIcon(); showControls(); break;
+        case 'Escape': if (!document.fullscreenElement) backBtn.click(); break;
+      }
+    });
+
+    $('#player').addEventListener('mousemove', showControls);
+    $('#player').addEventListener('click', (e) => { if (e.target === video) togglePlay(); });
+
+    // Autoplay + fullscreen
+    if (!src) {
+      errorEl.classList.add('active');
+      errorMsg.textContent = 'No video specified. Go back and pick one.';
+      return;
+    }
+
+    spinner.classList.add('active');
+    video.src = src;
+    video.load();
+
+    video.play().then(() => {
+      // Try to enter fullscreen (works on most browsers/TVs on user gesture).
+      try { document.documentElement.requestFullscreen(); } catch (e) {}
+    }).catch(() => {
+      // Autoplay blocked (browser policy). Don't show a scary error —
+      // just stop the spinner and wait for the user to press play.
+      spinner.classList.remove('active');
+      showControls();
+    });
+  })();
+  </script>
+</body>
+</html>

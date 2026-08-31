@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV Gallery</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d0d0d;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1f1f1f;
+      background: #111;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-weight: 300;
+      font-size: 1.6rem;
+      letter-spacing: 3px;
+    }
+
+    #fileCount { color: #888; font-size: 0.95rem; }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 24px;
+      padding: 32px;
+    }
+
+    .card {
+      background: #161616;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 2px solid transparent;
+      outline: none;
+    }
+
+    .card:hover, .card:focus {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      border-color: #4a9eff;
+    }
+
+    .thumb {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #000;
+    }
+
+    .thumb video, .thumb-placeholder {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      color: #333;
+      background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+    }
+
+    .play-badge {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 56px;
+      height: 56px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      color: #fff;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+
+    .card:hover .play-badge, .card:focus .play-badge { opacity: 1; }
+
+    .card-body { padding: 12px 14px; }
+
+    .card-title {
+      font-size: 0.98rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+
+    .card-meta { color: #666; font-size: 0.8rem; }
+
+    .empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 80px 32px;
+      color: #555;
+    }
+
+    .empty .icon { font-size: 4rem; margin-bottom: 16px; }
+    .empty p { font-size: 1.1rem; margin-bottom: 8px; }
+    .empty .hint { font-size: 0.9rem; }
+
+    /* Loading state for grid */
+    #loading {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px;
+      color: #555;
+    }
+    #loading.active { display: block; }
+    #loading:not(.active) { display: none; }
+
+    @media (max-width: 600px) {
+      #grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; padding: 20px; }
+      header { padding: 18px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎬 Movies</h1>
+    <span id="fileCount"></span>
+  </header>
+
+  <div id="grid">
+    <div id="loading" class="active">Loading videos…</div>
+  </div>
+
+  <script src="./config.js"></script>
+  <script>
+  (function() {
+    const grid = document.getElementById('grid');
+    const fileCount = document.getElementById('fileCount');
+    const loading = document.getElementById('loading');
+
+    // Video extensions we serve (mnf/playlist endpoints pushed by serve.sh)
+    const VIDEO_EXT = ['.mp4', '.webm', '.ogv', '.mov', '.m4v', '.mkv'];
+    const VIDEO_MIME = {
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.ogv': 'video/ogg',
+      '.mov': 'video/mp4',
+      '.m4v': 'video/mp4',
+      '.mkv': 'video/x-matroska'
+    };
+
+    // ── Build the file listing URL ──
+    // Two modes (see config.js):
+    //   LOCAL  (videoBase === "") : videos come from this site's ./movies/
+    //   REMOTE (videoBase set)   : videos stream from your PC via ngrok
+    // Remote mode also lists the folder through the remote host's list.json,
+    // so GitHub Pages can show and play whatever is on your PC.
+    const cfg = window.TV_CONFIG || {};
+    const remoteBase = (cfg.videoBase || '').replace(/\/+$/, '');
+    const BASE = remoteBase
+      ? remoteBase + '/'
+      : './movies/';
+
+    function listingUrl() {
+      return new URL(BASE + 'list.json', window.location.href).href;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch(listingUrl());
+        if (!res.ok) throw new Error('list.json not found');
+        const data = await res.json();
+        render(data.files || []);
+      } catch (err) {
+        // Fallback: if no list.json (e.g. GitHub Pages), try a hardcoded list.
+        render([]);
+        loading.classList.remove('active');
+        showEmpty();
+      }
+    }
+
+    function render(files) {
+      loading.classList.remove('active');
+
+      // Filter only video files (exclude list.json etc.)
+      const videos = files.filter(f =>
+        VIDEO_EXT.some(ext => f.name.toLowerCase().endsWith(ext)) &&
+        !f.name.toLowerCase().startsWith('list.')
+      );
+
+      fileCount.textContent = videos.length
+        ? videos.length + (videos.length === 1 ? ' video' : ' videos')
+        : '';
+
+      if (!videos.length) { showEmpty(); return; }
+
+      videos.forEach((f, i) => {
+        grid.appendChild(makeCard(f, i));
+      });
+    }
+
+    function showEmpty() {
+      fileCount.textContent = 'No videos found';
+      const div = document.createElement('div');
+      div.className = 'empty';
+      div.innerHTML = `
+        <div class="icon">🎬</div>
+        <p>No videos found</p>
+        <div class="hint">Add video files (.mp4 .webm .mkv etc.) to the <code>movies/</code> folder</div>
+      `;
+      grid.appendChild(div);
+    }
+
+    function makeCard(file, index) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.tabIndex = 0;
+
+      // Derive a single source URL (absolute), resolved under movies/
+      const src = new URL(BASE + file.name, window.location.href).href;
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      const cleanName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+      const mime = VIDEO_MIME[ext] || 'video/mp4';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.src = src;
+
+      video.addEventListener('error', function() {
+        // If native metadata extraction fails, show placeholder with play icon
+        thumb.innerHTML = '<div class="thumb-placeholder">🎥</div><div class="play-badge">▶</div>';
+      });
+
+      // Attempt to jump to a mid-frame to draw a real thumbnail.
+      // Some TVs need a play+seek; use loadedmetadata when available.
+      video.addEventListener('loadedmetadata', function() {
+        try {
+          if (isFinite(video.duration) && video.duration > 1) {
+            video.currentTime = Math.min(video.duration * 0.1, 5);
+          }
+        } catch (e) {}
+      });
+      // Seeking draws a frame on some browsers; try to capture it.
+      video.addEventListener('seeked', function() {
+        // A reset trick: some browsers only paint a frame after a tiny no-op
+        try {
+          const s = video.currentTime;
+          video.currentTime = s;
+        } catch (e) {}
+      });
+
+      thumb.appendChild(video);
+      const badge = document.createElement('div');
+      badge.className = 'play-badge';
+      badge.textContent = '▶';
+      thumb.appendChild(badge);
+
+      const body = document.createElement('div');
+      body.className = 'card-body';
+
+      const title = document.createElement('div');
+      title.className = 'card-title';
+      title.textContent = cleanName;
+
+      const meta = document.createElement('div');
+      meta.className = 'card-meta';
+      meta.textContent = (file.size ? formatSize(file.size) : ext.replace('.', '').toUpperCase());
+
+      body.appendChild(title);
+      body.appendChild(meta);
+
+      card.appendChild(thumb);
+      card.appendChild(body);
+
+      // Click -> go to player in fullscreen
+      card.addEventListener('click', () => openVideo(src, cleanName, mime, index));
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          card.click();
+        }
+      });
+
+      return card;
+    }
+
+    function formatSize(bytes) {
+      if (typeof bytes !== 'number') return '';
+      const g = bytes / (1024**3);
+      const m = bytes / (1024**2);
+      if (g >= 1) return g.toFixed(1) + ' GB';
+      return m.toFixed(0) + ' MB';
+    }
+
+    function openVideo(src, title, mime, index) {
+      // Build the player URL with query params, open fullscreen-friendly player page.
+      const playerUrl = new URL('./player.html', window.location.href);
+      playerUrl.searchParams.set('src', src);
+      playerUrl.searchParams.set('title', title);
+      window.location.href = playerUrl.href;
+    }
+
+    // Start
+    load();
+  })();
+  </script>
+</body>
+</html>
